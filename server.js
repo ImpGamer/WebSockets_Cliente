@@ -25,6 +25,8 @@ function originIsAllowed(origin) {
   return true;
 }
 
+let clientes = []
+
 wsServer.on('request', function(request) {
     //Preguna si la peticion viene de una fuente confiable, en este caso siempre retornara si, ya que asi lo marca la funcion "originIsAllowed"
     if (!originIsAllowed(request.origin)) {
@@ -34,6 +36,8 @@ wsServer.on('request', function(request) {
     }
     //?Cuando alguien haga la peticion a este servidor, la permitira
     const connection = request.accept(null, request.origin);
+    //Por cada conexion realizada vamos a agregarla al arreglo para saber los usuarios que se encuentran conectados
+    clientes.push(connection)
     console.log((new Date()) + ' Connection accepted.');
 
     //*Cuando se reciba un mensaje del cliente
@@ -41,17 +45,22 @@ wsServer.on('request', function(request) {
         //!Si el mensaje es tipo 'utf8' a ese mismo cliente se le retornara el mensaje en 'utf8'
         if (message.type === 'utf8') {
             console.log('Received Message: ' + message.utf8Data);
-            connection.sendUTF(message.utf8Data);
+            //Cada vez que se reciba informacion, se lo enviaremos a cada uno de los clientes conectados
+            clientes.forEach(client => client.sendUTF(message.utf8Data))
         }
         /*Pero si se envian datos en binario (tambien se pueden mandar mensajes de esa manera) le retornara al usuario el mensaje
         en binario*/
         else if (message.type === 'binary') {
             console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
-            connection.sendBytes(message.binaryData);
+            clientes.forEach(client => client.sendBytes(message.binaryData))
         }
     });
     //?Cuando se cierre la conexion con el cliente, se le hara saber al cliente
     connection.on('close', function(reasonCode, description) {
         console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
+        //Buscara el indice dentro de nuestro arreglo de la conexion
+        const index = clientes.indexOf(connection)
+        //Una vez cerrada la conexion sacaremos a nuestro cliente fuera de las conexiones
+        if(index > -1) {clientes.splice(index,1)}
     });
 });
